@@ -7,8 +7,10 @@ import Timetable from "../models/Timetable.js";
 import { generateTimetablePDF } from "../utils/pdf_export.js";
 import { inngest } from "../inngest/client.js";
 
+import { getIO } from "../socketServer.js";
+
 /* =========================================
-   GENERATE TIMETABLE (INNGEST BACKGROUND JOB)
+   GENERATE TIMETABLE (INNGEST TRIGGER)
 ========================================= */
 export const generateTimetable = async (req, res) => {
   try {
@@ -31,7 +33,13 @@ export const generateTimetable = async (req, res) => {
       });
     }
 
-    /* 🔥 Trigger Inngest event */
+    const io = getIO();
+
+    // 🔥 START EVENT
+    io.emit("timetableProgress", {
+      status: "started",
+      message: "Timetable generation started...",
+    });
 
     await inngest.send({
       name: "timetable/generate",
@@ -47,8 +55,16 @@ export const generateTimetable = async (req, res) => {
       success: true,
       message: "Timetable generation started in background",
     });
+
   } catch (error) {
     console.error("Error starting timetable generation:", error);
+
+    const io = getIO();
+
+    io.emit("timetableProgress", {
+      status: "error",
+      message: "Failed to start timetable",
+    });
 
     res.status(500).json({
       success: false,
@@ -97,6 +113,7 @@ export const getTimetable = async (req, res) => {
       success: true,
       data: timetable,
     });
+
   } catch (error) {
     console.error("Error fetching timetable:", error);
 
@@ -144,6 +161,7 @@ export const exportTimetablePDF = async (req, res) => {
     }
 
     generateTimetablePDF(timetable.data, res);
+
   } catch (error) {
     console.error("Error exporting timetable PDF:", error);
 
@@ -167,7 +185,7 @@ export const getTimetableByTeacher = async (req, res) => {
       isActive: true,
     });
 
-    if (timetables.length === 0) {
+    if (!timetables.length) {
       return res.status(404).json({
         success: false,
         message: "No timetables found for this teacher",
@@ -190,6 +208,7 @@ export const getTimetableByTeacher = async (req, res) => {
       success: true,
       data: organized,
     });
+
   } catch (error) {
     console.error("Error fetching teacher timetable:", error);
 
@@ -209,9 +228,7 @@ export const updateTimetableEntry = async (req, res) => {
     const { id } = req.params;
     const { day, slot, subjectId, teacherId, roomId } = req.body;
 
-    const timetable = await Timetable.findOne({
-      "data._id": id,
-    });
+    const timetable = await Timetable.findOne({ "data._id": id });
 
     if (!timetable) {
       return res.status(404).json({
@@ -247,6 +264,7 @@ export const updateTimetableEntry = async (req, res) => {
       message: "Timetable entry updated successfully",
       data: updated.data.id(id),
     });
+
   } catch (error) {
     console.error("Error updating timetable entry:", error);
 
@@ -293,6 +311,7 @@ export const deleteTimetable = async (req, res) => {
       success: true,
       message: "Timetable deleted successfully",
     });
+
   } catch (error) {
     console.error("Error deleting timetable:", error);
 

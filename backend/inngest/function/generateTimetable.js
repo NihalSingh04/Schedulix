@@ -9,34 +9,33 @@ import Timetable from "../../models/Timetable.js";
 
 import { generateTimetableWithCPSAT } from "../../service/timetableService.js";
 import { sendEmail } from "../../utils/sendEmail.js";
-import { io } from "../../server.js";
+
+import { getIO } from "../../socketServer.js"; // ✅ FIXED
 
 export const generateTimetableJob = inngest.createFunction(
   { id: "generate-timetable-job" },
   { event: "timetable/generate" },
 
   async ({ event }) => {
+    console.log("🔥 INNGEST STARTED");
 
-    console.log("🔥 INNGEST FUNCTION STARTED");
-    console.log("Event payload:", event.data);
+    const io = getIO();
 
     try {
-
       await connectDB();
 
       const { department, semester, section, academicYear } = event.data;
-
       const semesterNum = Number(semester);
 
-      const teachers = await Teacher.find({ department });
-
-      const subjects = await Subject.find({
-        department,
-        semester: semesterNum
+      // 🔥 PROCESSING EVENT
+      io.emit("timetableProgress", {
+        status: "processing",
+        message: "Running CP-SAT solver...",
       });
 
+      const teachers = await Teacher.find({ department });
+      const subjects = await Subject.find({ department, semester: semesterNum });
       const rooms = await Room.find({ department });
-
       const constraints = await Constraint.find({});
 
       const result = await generateTimetableWithCPSAT({
@@ -48,9 +47,7 @@ export const generateTimetableJob = inngest.createFunction(
         section,
       });
 
-      if (!result || !result.success) {
-        throw new Error("Timetable generation failed");
-      }
+      if (!result?.success) throw new Error("Solver failed");
 
       const saved = await Timetable.findOneAndUpdate(
         {
@@ -58,58 +55,54 @@ export const generateTimetableJob = inngest.createFunction(
           semester: semesterNum,
           section,
           academicYear,
-          isActive: true
+          isActive: true,
         },
         {
           department,
           semester: semesterNum,
           section,
           academicYear,
-          data: result.data || [],
-          conflicts: result.conflicts || [],
-          score: result.score || 0,
+          data: result.data,
+          conflicts: result.conflicts,
+          score: result.score,
           generatedBy: "CP-SAT",
           generatedAt: new Date(),
-          isActive: true
+          isActive: true,
         },
-        {
-          upsert: true,
-          returnDocument: "after",
-        }
+        { upsert: true, returnDocument: "after" }
       );
 
-      console.log("✅ Timetable saved:", saved?._id);
+      console.log("✅ Saved:", saved?._id);
 
-      /* ===============================
-         SOCKET NOTIFICATION
-      =============================== */
-
+      // 🔥 SUCCESS EVENTS
       io.emit("timetableGenerated", {
         department,
         semester: semesterNum,
         section,
-        academicYear
+        academicYear,
       });
 
-      console.log("📡 Socket event emitted");
+      io.emit("timetableProgress", {
+        status: "completed",
+        message: "Timetable generated 🎉",
+      });
 
-      /* ===============================
-         EMAIL NOTIFICATION
-      =============================== */
-
+      // 📧 EMAIL
       await sendEmail({
         to: process.env.EMAIL_USER,
-        subject: "📅 Timetable Generated Successfully",
-        text: `Timetable generated for ${department} Semester ${semester} Section ${section}`
+        subject: "Timetable Generated",
+        text: `Generated for ${department} Sem ${semester}`,
       });
-
-      console.log("📧 Email notification sent");
 
       return { success: true };
 
     } catch (error) {
+      console.error("❌ ERROR:", error);
 
-      console.error("❌ INNGEST FUNCTION ERROR:", error);
+      io.emit("timetableProgress", {
+        status: "error",
+        message: "Generation failed ❌",
+      });
 
       throw error;
     }
