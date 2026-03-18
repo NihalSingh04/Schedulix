@@ -5,16 +5,26 @@ let io;
 export const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || "http://localhost:5173",
+      origin: [
+        "http://localhost:5173",
+        "https://schedio-sable.vercel.app",
+      ],
+      methods: ["GET", "POST"],
       credentials: true,
     },
+    transports: ["websocket", "polling"], // 🔥 fallback support
   });
 
   io.on("connection", (socket) => {
     console.log("⚡ Client connected:", socket.id);
 
-    socket.on("disconnect", () => {
-      console.log("❌ Client disconnected:", socket.id);
+    socket.on("disconnect", (reason) => {
+      console.log("❌ Client disconnected:", socket.id, "| Reason:", reason);
+    });
+
+    // 🔥 optional debug
+    socket.on("error", (err) => {
+      console.error("Socket error:", err);
     });
   });
 
