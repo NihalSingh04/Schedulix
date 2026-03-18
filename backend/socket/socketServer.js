@@ -5,14 +5,27 @@ let io;
 export const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: [
-        "http://localhost:5173",
-        "https://schedio-sable.vercel.app",
-      ],
+      origin: (origin, callback) => {
+        const allowedOrigins = [
+          "http://localhost:5173",
+          "https://schedio-sable.vercel.app",
+        ];
+
+        // allow requests with no origin (like mobile apps / curl)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+
+        return callback(new Error("CORS not allowed"), false);
+      },
       methods: ["GET", "POST"],
       credentials: true,
     },
-    transports: ["websocket", "polling"], // 🔥 fallback support
+
+    // 🔥 IMPORTANT: polling first for Render
+    transports: ["polling", "websocket"],
   });
 
   io.on("connection", (socket) => {
@@ -22,9 +35,8 @@ export const initSocket = (server) => {
       console.log("❌ Client disconnected:", socket.id, "| Reason:", reason);
     });
 
-    // 🔥 optional debug
     socket.on("error", (err) => {
-      console.error("Socket error:", err);
+      console.error("🔥 Socket error:", err);
     });
   });
 
