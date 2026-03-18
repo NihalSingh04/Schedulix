@@ -1,8 +1,8 @@
 import { io } from "socket.io-client";
 
-const SOCKET_URL = import.meta.env.VITE_API_URL;
+const SOCKET_URL = "https://schedio-backend.onrender.com";
 
 export const socket = io(SOCKET_URL, {
-  transports: ["websocket"],
+  transports: ["polling", "websocket"], // 🔥 IMPORTANT
   withCredentials: true,
 });
