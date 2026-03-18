@@ -14,8 +14,7 @@ import testRoutes from "./routes/testRoutes.js";
 import { serve } from "inngest/express";
 import { inngest } from "./inngest/client.js";
 import { generateTimetableJob } from "./inngest/function/generateTimetable.js";
-
-import { initSocket } from "./socketServer.js";
+import { initSocket } from "./socket/socketServer.js";
 
 dotenv.config();
 
