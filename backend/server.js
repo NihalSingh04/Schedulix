@@ -14,6 +14,7 @@ import testRoutes from "./routes/testRoutes.js";
 import { serve } from "inngest/express";
 import { inngest } from "./inngest/client.js";
 import { generateTimetableJob } from "./inngest/function/generateTimetable.js";
+
 import { initSocket } from "./socket/socketServer.js";
 
 dotenv.config();
@@ -37,10 +38,17 @@ const startServer = async () => {
 
     app.use(
       cors({
-        origin: process.env.FRONTEND_URL || "https://schedio-sable.vercel.app",
-        withCredentials: true,
+        origin: [
+          "http://localhost:5173",
+          "https://schedio-sable.vercel.app",
+        ],
+        methods: ["GET", "POST", "PUT", "DELETE"],
+        credentials: true, // ✅ FIXED
       })
     );
+
+    // ✅ IMPORTANT for preflight
+    app.options("*", cors());
 
     /* ===============================
        HEALTH CHECK
@@ -96,6 +104,3 @@ const startServer = async () => {
 };
 
 startServer();
-
-
-

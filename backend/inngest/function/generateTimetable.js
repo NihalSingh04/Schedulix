@@ -10,14 +10,14 @@ import Timetable from "../../models/Timetable.js";
 import { generateTimetableWithCPSAT } from "../../service/timetableService.js";
 import { sendEmail } from "../../utils/sendEmail.js";
 
-import { getIO } from "../../socket/socketServer.js"; // ✅ FIXED
+import { getIO } from "../../socket/socketServer.js";
 
 export const generateTimetableJob = inngest.createFunction(
   { id: "generate-timetable-job" },
   { event: "timetable/generate" },
 
   async ({ event }) => {
-    console.log("🔥 INNGEST STARTED");
+    console.log("🔥 INNGEST FUNCTION STARTED");
 
     const io = getIO();
 
@@ -27,7 +27,7 @@ export const generateTimetableJob = inngest.createFunction(
       const { department, semester, section, academicYear } = event.data;
       const semesterNum = Number(semester);
 
-      // 🔥 PROCESSING EVENT
+      // 🔥 PROGRESS
       io.emit("timetableProgress", {
         status: "processing",
         message: "Running CP-SAT solver...",
@@ -47,7 +47,9 @@ export const generateTimetableJob = inngest.createFunction(
         section,
       });
 
-      if (!result?.success) throw new Error("Solver failed");
+      if (!result?.success) {
+        throw new Error(result?.error || "Solver failed");
+      }
 
       const saved = await Timetable.findOneAndUpdate(
         {
@@ -72,9 +74,9 @@ export const generateTimetableJob = inngest.createFunction(
         { upsert: true, returnDocument: "after" }
       );
 
-      console.log("✅ Saved:", saved?._id);
+      console.log("✅ Timetable saved:", saved?._id);
 
-      // 🔥 SUCCESS EVENTS
+      // 🔥 SUCCESS
       io.emit("timetableGenerated", {
         department,
         semester: semesterNum,
@@ -87,17 +89,19 @@ export const generateTimetableJob = inngest.createFunction(
         message: "Timetable generated 🎉",
       });
 
-      // 📧 EMAIL
-      await sendEmail({
-        to: process.env.EMAIL_USER,
-        subject: "Timetable Generated",
-        text: `Generated for ${department} Sem ${semester}`,
-      });
+      // 📧 EMAIL (safe)
+      if (process.env.EMAIL_USER) {
+        await sendEmail({
+          to: process.env.EMAIL_USER,
+          subject: "Timetable Generated",
+          text: `Generated for ${department} Sem ${semester}`,
+        });
+      }
 
       return { success: true };
 
     } catch (error) {
-      console.error("❌ ERROR:", error);
+      console.error("❌ INNGEST ERROR:", error);
 
       io.emit("timetableProgress", {
         status: "error",
