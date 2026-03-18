@@ -25,7 +25,7 @@ export const initSocket = (server) => {
     },
 
     // 🔥 IMPORTANT: polling first for Render
-    transports: ["polling", "websocket"],
+    transports: ["polling"],
   });
 
   io.on("connection", (socket) => {
