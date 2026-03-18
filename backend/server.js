@@ -1,6 +1,5 @@
 import express from "express";
 import dotenv from "dotenv";
-import cors from "cors";
 import http from "http";
 
 import connectDB from "./config/db.js";
@@ -32,35 +31,44 @@ const startServer = async () => {
     initSocket(server);
 
     /* ===============================
-       MIDDLEWARES
+       GLOBAL MIDDLEWARES
     =============================== */
     app.use(express.json());
 
-    app.use(
-      cors({
-        origin: [
-          "http://localhost:5173",
-          process.env.FRONTEND_URL,
-          "https://schedio-sable.vercel.app",
-        ],
-        methods: ["GET", "POST", "PUT", "DELETE"],
-        credentials: true, // ✅ FIXED
-      })
-    );
-
+    /* ===============================
+       CORS (FINAL FIX)
+    =============================== */
     app.use((req, res, next) => {
-      res.header("Access-Control-Allow-Origin", "https://schedio-sable.vercel.app");
-      res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-      res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-      res.header("Access-Control-Allow-Credentials", "true");
-    
+      const allowedOrigins = [
+        "http://localhost:5173",
+        "https://schedio-sable.vercel.app",
+      ];
+
+      const origin = req.headers.origin;
+
+      if (allowedOrigins.includes(origin)) {
+        res.setHeader("Access-Control-Allow-Origin", origin);
+      }
+
+      res.setHeader(
+        "Access-Control-Allow-Methods",
+        "GET,POST,PUT,DELETE,OPTIONS"
+      );
+
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization"
+      );
+
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+
+      // ✅ Handle preflight
       if (req.method === "OPTIONS") {
         return res.sendStatus(200);
       }
+
       next();
     });
-
-    // ✅ IMPORTANT for prefligh
 
     /* ===============================
        HEALTH CHECK
