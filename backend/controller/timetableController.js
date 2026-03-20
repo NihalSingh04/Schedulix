@@ -14,7 +14,8 @@ export const generateTimetable = async (req, res) => {
     if (!department || !semester || !section || !academicYear) {
       return res.status(400).json({
         success: false,
-        message: "Department, semester, section, and academicYear are required",
+        message:
+          "Department, semester, section, and academicYear are required",
       });
     }
 
@@ -29,14 +30,18 @@ export const generateTimetable = async (req, res) => {
       });
     }
 
-    // 🔌 Optional socket start event
-    const io = getIO();
+    /* SOCKET START EVENT */
+    let io;
+    try {
+      io = getIO();
+    } catch {}
+
     io?.emit("timetableProgress", {
       status: "started",
       message: "Timetable generation started...",
     });
 
-    // 🚀 Always trigger Inngest
+    /* TRIGGER INNGEST */
     await inngest.send({
       name: "timetable/generate",
       data: {
@@ -70,10 +75,28 @@ export const getTimetable = async (req, res) => {
   try {
     const { department, semester, section, academicYear } = req.query;
 
+    if (!department || !semester || !section || !academicYear) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing query parameters",
+      });
+    }
+
+    const dept = department.toUpperCase();
+    const sec = section.toUpperCase();
+    const semesterNum = Number(semester);
+
+    console.log("Searching timetable:", {
+      dept,
+      semesterNum,
+      sec,
+      academicYear
+    });
+
     const timetable = await Timetable.findOne({
-      department: department.toUpperCase(),
-      semester: Number(semester),
-      section: section.toUpperCase(),
+      department: dept,
+      semester: semesterNum,
+      section: sec,
       academicYear,
       isActive: true,
     })
@@ -82,19 +105,23 @@ export const getTimetable = async (req, res) => {
       .populate("data.subjectId", "name code");
 
     if (!timetable) {
+      console.log("No timetable found");
+
       return res.status(404).json({
         success: false,
         message: "Timetable not found",
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: timetable,
     });
 
   } catch (error) {
-    res.status(500).json({
+    console.error("❌ GET TIMETABLE ERROR:", error.message);
+
+    return res.status(500).json({
       success: false,
       error: error.message,
     });
@@ -126,7 +153,7 @@ export const exportTimetablePDF = async (req, res) => {
     generateTimetablePDF(timetable.data, res);
 
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message,
     });
@@ -152,13 +179,13 @@ export const getTimetableByTeacher = async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       data: timetables,
     });
 
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message,
     });
@@ -171,7 +198,6 @@ export const getTimetableByTeacher = async (req, res) => {
 export const updateTimetableEntry = async (req, res) => {
   try {
     const { id } = req.params;
-    const { day, slot, subjectId, teacherId, roomId } = req.body;
 
     const timetable = await Timetable.findOne({
       "data._id": id,
@@ -186,22 +212,18 @@ export const updateTimetableEntry = async (req, res) => {
 
     const entry = timetable.data.id(id);
 
-    if (day) entry.day = day;
-    if (slot !== undefined) entry.slot = slot;
-    if (subjectId) entry.subjectId = subjectId;
-    if (teacherId) entry.teacherId = teacherId;
-    if (roomId) entry.roomId = roomId;
+    Object.assign(entry, req.body);
 
     await timetable.save();
 
-    res.json({
+    return res.json({
       success: true,
       message: "Entry updated successfully",
       data: entry,
     });
 
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message,
     });
@@ -229,13 +251,13 @@ export const deleteTimetable = async (req, res) => {
       });
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: "Timetable deleted successfully",
     });
 
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: error.message,
     });
