@@ -4,7 +4,14 @@ export const sendEmail = async ({ to, subject, text }) => {
   try {
 
     console.log("EMAIL_USER:", process.env.EMAIL_USER);
-    console.log("EMAIL_PASS:", process.env.EMAIL_PASS ? "Loaded ✅" : "Missing ❌");
+    console.log(
+      "EMAIL_PASS:",
+      process.env.EMAIL_PASS ? "Loaded ✅" : "Missing ❌"
+    );
+
+    /* ===============================
+       CREATE TRANSPORTER
+    =============================== */
 
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
@@ -12,21 +19,19 @@ export const sendEmail = async ({ to, subject, text }) => {
       secure: true,
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
+        pass: process.env.EMAIL_PASS,
+      },
     });
 
-    await sendEmail({
-      to: "your_email@gmail.com",
-      subject: "Test Mail",
-      text: "Hello from Schedio 🚀",
-    });
+    /* ===============================
+       SEND EMAIL
+    =============================== */
 
     const info = await transporter.sendMail({
       from: `"Schedio" <${process.env.EMAIL_USER}>`,
       to,
       subject,
-      text
+      text,
     });
 
     console.log("📧 Email sent successfully");
@@ -36,7 +41,7 @@ export const sendEmail = async ({ to, subject, text }) => {
   } catch (error) {
 
     console.error("❌ Email sending failed");
-    console.error(error);
+    console.error(error.message);
 
   }
 };
